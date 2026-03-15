@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Globe, LoaderCircle, Palette, Search, Sparkles } from "lucide-react";
+import { Check, ExternalLink, Globe, LoaderCircle, Palette, Search } from "lucide-react";
 import { Button } from "./components/ui/button.jsx";
 import { Card } from "./components/ui/card.jsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select.jsx";
@@ -10,14 +10,14 @@ import { extractSpotifyMetadata, findBandcampMatches, getActiveTab, isSpotifyAlb
 
 const DEFAULT_SETTINGS = {
   language: "en",
-  theme: "parchment",
+  theme: "spotify",
   resultCount: "6"
 };
 
 const COPY = {
   en: {
     appTitle: "Bandcamp Wishlist Bridge",
-    appSubtitle: "Shadcn-style popup for jumping from the current Spotify album to the closest Bandcamp release.",
+    appSubtitle: "A cleaner popup for tracking the current Spotify album and opening the closest Bandcamp release.",
     matchesTab: "Matches",
     settingsTab: "Settings",
     noAlbumTitle: "Waiting for a Spotify album page",
@@ -42,14 +42,14 @@ const COPY = {
     resultCountHint: "Choose how many Bandcamp matches to display for each album.",
     english: "English",
     french: "Français",
-    parchment: "Parchment",
-    ocean: "Ocean",
+    spotify: "Spotify",
+    bandcamp: "Bandcamp",
     graphite: "Graphite",
     footer: "Some searches can take a moment, so the popup now keeps a live loader visible while it works."
   },
   fr: {
     appTitle: "Bandcamp Wishlist Bridge",
-    appSubtitle: "Popup React pour passer rapidement de l'album Spotify courant à la meilleure page Bandcamp.",
+    appSubtitle: "Un popup plus propre pour suivre l'album Spotify courant et ouvrir la meilleure page Bandcamp.",
     matchesTab: "Correspondances",
     settingsTab: "Réglages",
     noAlbumTitle: "En attente d'une page album Spotify",
@@ -74,8 +74,8 @@ const COPY = {
     resultCountHint: "Définis combien de résultats Bandcamp afficher pour chaque album.",
     english: "English",
     french: "Français",
-    parchment: "Parchemin",
-    ocean: "Océan",
+    spotify: "Spotify",
+    bandcamp: "Bandcamp",
     graphite: "Graphite",
     footer: "Certaines recherches prennent un peu de temps, donc le popup garde maintenant un indicateur visible pendant le chargement."
   }
@@ -225,16 +225,17 @@ export function App() {
   return (
     <div className="popup-shell">
       <header className="hero-card">
+        <p className="eyebrow">Spotify to Bandcamp</p>
         <div className="hero-row">
+          <h1 className="title">{t.appTitle}</h1>
+        </div>
+        <p className="subtitle">{t.appSubtitle}</p>
+        <div style={{ marginTop: 14 }}>
           <span className={`status-pill ${status.tone}`}>
             {isBusy ? <Spinner /> : <Check size={14} />}
             {status.text}
           </span>
-          <Sparkles size={18} />
         </div>
-        <p className="eyebrow">Spotify to Bandcamp</p>
-        <h1 className="title">{t.appTitle}</h1>
-        <p className="subtitle">{t.appSubtitle}</p>
       </header>
 
       <Tabs className="tabs-root" value={activeTab} onValueChange={setActiveTab}>
@@ -298,7 +299,7 @@ export function App() {
                   {match.label ? <p className="result-meta">{match.label}</p> : null}
                   <div style={{ marginTop: 10 }}>
                     <Button
-                      className="ui-button-secondary"
+                      variant="secondary"
                       disabled={phase === "opening"}
                       onClick={() => openBandcampRelease(match)}
                     >
@@ -340,8 +341,8 @@ export function App() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="ui-select-content">
-                  <SelectItem className="ui-select-item" value="parchment">{t.parchment}</SelectItem>
-                  <SelectItem className="ui-select-item" value="ocean">{t.ocean}</SelectItem>
+                  <SelectItem className="ui-select-item" value="spotify">{t.spotify}</SelectItem>
+                  <SelectItem className="ui-select-item" value="bandcamp">{t.bandcamp}</SelectItem>
                   <SelectItem className="ui-select-item" value="graphite">{t.graphite}</SelectItem>
                 </SelectContent>
               </Select>
