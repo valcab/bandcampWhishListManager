@@ -6,8 +6,11 @@ const coverNode = document.getElementById("cover");
 const albumTitleNode = document.getElementById("album-title");
 const albumArtistNode = document.getElementById("album-artist");
 const RESULT_LIMIT = 6;
+const REFRESH_INTERVAL_MS = 1200;
 
 let metadata = null;
+let currentAlbumKey = "";
+let refreshTimer = null;
 
 initialize().catch((error) => {
   setStatus(error instanceof Error ? error.message : String(error));
@@ -24,6 +27,7 @@ searchButton.addEventListener("click", () => {
 });
 
 async function initialize() {
+  clearResults();
   const [tab] = await chrome.tabs.query({
     active: true,
     currentWindow: true
@@ -34,16 +38,58 @@ async function initialize() {
     return;
   }
 
-  metadata = await extractSpotifyMetadata(tab);
+  await refreshFromTab(tab);
+  startAutoRefresh();
+}
 
-  if (!metadata?.album || !metadata?.artist) {
+async function refreshFromTab(tab) {
+  const nextMetadata = await extractSpotifyMetadata(tab);
+
+  if (!nextMetadata?.album || !nextMetadata?.artist) {
+    metadata = null;
+    currentAlbumKey = "";
+    hideAlbum();
     setStatus("I found the Spotify album page, but not enough metadata to search Bandcamp.");
     return;
   }
 
+  const nextAlbumKey = `${nextMetadata.album}::${nextMetadata.artist}`.toLowerCase();
+  if (currentAlbumKey && currentAlbumKey !== nextAlbumKey) {
+    clearResults();
+  }
+
+  metadata = nextMetadata;
+  currentAlbumKey = nextAlbumKey;
   renderAlbum(metadata);
   searchButton.disabled = false;
   setStatus("Ready. Search Bandcamp and add the best match to your wishlist.");
+}
+
+function startAutoRefresh() {
+  if (refreshTimer) {
+    window.clearInterval(refreshTimer);
+  }
+
+  refreshTimer = window.setInterval(async () => {
+    try {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+
+      if (!tab?.id || !tab.url || !isSpotifyAlbumUrl(tab.url)) {
+        return;
+      }
+
+      const nextMetadata = await extractSpotifyMetadata(tab);
+      const nextAlbumKey = `${nextMetadata?.album ?? ""}::${nextMetadata?.artist ?? ""}`.toLowerCase();
+      if (!nextAlbumKey || nextAlbumKey === currentAlbumKey) {
+        return;
+      }
+
+      await refreshFromTab(tab);
+    } catch {}
+  }, REFRESH_INTERVAL_MS);
 }
 
 async function extractSpotifyMetadata(tab) {
@@ -233,6 +279,14 @@ function renderAlbum(details) {
   coverNode.alt = `${details.album} cover`;
 }
 
+function hideAlbum() {
+  albumCard.classList.add("hidden");
+  albumTitleNode.textContent = "";
+  albumArtistNode.textContent = "";
+  coverNode.removeAttribute("src");
+  coverNode.alt = "";
+}
+
 async function searchMatches(details) {
   searchButton.disabled = true;
   setStatus("Searching Bandcamp...");
@@ -321,6 +375,12 @@ async function openAndWishlist(result) {
 
 function setStatus(message) {
   statusNode.textContent = message;
+}
+
+function clearResults() {
+  resultsNode.classList.add("hidden");
+  resultsNode.replaceChildren();
+  searchButton.disabled = true;
 }
 
 function isSpotifyAlbumUrl(rawUrl) {
