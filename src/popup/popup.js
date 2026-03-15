@@ -349,10 +349,10 @@ function withBridgeHash(url, details) {
 }
 
 function scoreMatch(source, candidate) {
-  const titleScore = similarity(source.album, candidate.title);
-  const artistScore = similarity(source.artist, candidate.artist);
+  const titleScore = combinedFieldScore(source.album, candidate.title);
+  const artistScore = combinedFieldScore(source.artist, candidate.artist);
   const slugBonus = scoreSlugMatch(source.artist, candidate.url);
-  return Math.round((titleScore * 0.55 + artistScore * 0.35 + slugBonus * 0.1) * 100);
+  return Math.round((titleScore * 0.65 + artistScore * 0.25 + slugBonus * 0.1) * 100);
 }
 
 function similarity(left, right) {
@@ -376,9 +376,35 @@ function similarity(left, right) {
   return (2 * shared) / (leftSet.size + rightSet.size);
 }
 
+function combinedFieldScore(left, right) {
+  const normalizedLeft = normalizeForComparison(left);
+  const normalizedRight = normalizeForComparison(right);
+
+  if (!normalizedLeft || !normalizedRight) {
+    return 0;
+  }
+
+  if (normalizedLeft === normalizedRight) {
+    return 1;
+  }
+
+  if (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft)) {
+    return 0.96;
+  }
+
+  const leftCompact = compactForComparison(left);
+  const rightCompact = compactForComparison(right);
+  if (leftCompact && rightCompact && leftCompact === rightCompact) {
+    return 0.98;
+  }
+
+  const tokenScore = similarity(left, right);
+  const orderedBonus = hasOrderedTokenRun(tokenize(left), tokenize(right)) ? 0.12 : 0;
+  return Math.min(1, tokenScore + orderedBonus);
+}
+
 function tokenize(value) {
-  return asciiFold(String(value ?? ""))
-    .normalize("NFKD")
+  return normalizeForComparison(value)
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
     .filter(Boolean);
@@ -389,6 +415,29 @@ function asciiFold(value) {
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function normalizeForComparison(value) {
+  return asciiFold(String(value ?? ""))
+    .replace(/[()[\]{}]/g, " ")
+    .replace(/\b(the|a|an|ep|lp|album|single|remaster(?:ed)?|deluxe|edition)\b/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactForComparison(value) {
+  return normalizeForComparison(value).replace(/\s+/g, "");
+}
+
+function hasOrderedTokenRun(leftTokens, rightTokens) {
+  if (!leftTokens.length || !rightTokens.length) {
+    return false;
+  }
+
+  const rightJoined = rightTokens.join(" ");
+  const leftJoined = leftTokens.join(" ");
+  return rightJoined.includes(leftJoined) || leftJoined.includes(rightJoined);
 }
 
 function scoreSlugMatch(artist, url) {
