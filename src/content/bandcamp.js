@@ -52,6 +52,16 @@ function attemptWishlistClick() {
 }
 
 function findWishlistControl() {
+  const wishlistMessage = document.getElementById("wishlist-msg");
+  if (wishlistMessage) {
+    const clickableParent = wishlistMessage.closest("button, a, span, div");
+    if (clickableParent) {
+      return clickableParent;
+    }
+
+    return wishlistMessage;
+  }
+
   const selectors = [
     ".fav-track-or-album",
     ".wishlist-button",
@@ -73,6 +83,7 @@ function findWishlistControl() {
 
 function readLabel(node) {
   return [
+    node.id,
     node.getAttribute("aria-label"),
     node.getAttribute("title"),
     node.textContent
