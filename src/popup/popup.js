@@ -343,8 +343,8 @@ async function searchMatches(details) {
   const quickAdd = document.createElement("button");
   quickAdd.className = "primary";
   quickAdd.type = "button";
-  quickAdd.textContent = `Quick add best match (${topMatch.score}%)`;
-  quickAdd.addEventListener("click", () => openAndWishlist(topMatch));
+  quickAdd.textContent = `Open best match (${topMatch.score}%)`;
+  quickAdd.addEventListener("click", () => openBandcampRelease(topMatch));
 
   resultsNode.appendChild(quickAdd);
 
@@ -388,22 +388,18 @@ function renderResult(result) {
   const addButton = document.createElement("button");
   addButton.className = "secondary";
   addButton.type = "button";
-  addButton.textContent = "Open and wishlist";
-  addButton.addEventListener("click", () => openAndWishlist(result));
+  addButton.textContent = "Open on Bandcamp";
+  addButton.addEventListener("click", () => openBandcampRelease(result));
   body.appendChild(addButton);
 
   wrapper.appendChild(body);
   return wrapper;
 }
 
-async function openAndWishlist(result) {
-  if (!metadata) {
-    return;
-  }
-
+async function openBandcampRelease(result) {
   setStatus(`Opening ${result.title} on Bandcamp...`);
   await chrome.tabs.create({
-    url: withBridgeHash(result.url, metadata),
+    url: result.url,
     active: true
   });
 
@@ -512,16 +508,6 @@ function extractResult(node, metadata) {
     art,
     score
   };
-}
-
-function withBridgeHash(url, details) {
-  const hashPayload = new URLSearchParams({
-    bcwlm: "1",
-    artist: details.artist ?? "",
-    album: details.album ?? ""
-  });
-  const cleanUrl = url.split("#")[0];
-  return `${cleanUrl}#${hashPayload.toString()}`;
 }
 
 function scoreMatch(source, candidate) {

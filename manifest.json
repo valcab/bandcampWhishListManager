@@ -17,16 +17,5 @@
   "action": {
     "default_title": "Bandcamp Wishlist Bridge",
     "default_popup": "src/popup/popup.html"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://*.bandcamp.com/*"
-      ],
-      "js": [
-        "src/content/bandcamp.js"
-      ],
-      "run_at": "document_idle"
-    }
-  ]
+  }
 }
