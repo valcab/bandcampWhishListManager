@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bandcamp Wishlist Bridge</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <p class="eyebrow">Spotify to Bandcamp</p>
+        <h1>Bandcamp Wishlist Bridge</h1>
+        <p class="subcopy" id="status">Open a Spotify album page to get started.</p>
+      </section>
+
+      <section class="album hidden" id="album-card">
+        <img alt="" class="cover" id="cover" />
+        <div>
+          <p class="label">Album</p>
+          <h2 id="album-title"></h2>
+          <p class="meta" id="album-artist"></p>
+        </div>
+      </section>
+
+      <section class="actions">
+        <button class="primary" id="search-btn" type="button" disabled>Find Bandcamp Matches</button>
+      </section>
+
+      <section class="results hidden" id="results"></section>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>

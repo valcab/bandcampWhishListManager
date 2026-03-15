@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Bandcamp Wishlist Bridge",
+  "description": "Find a Spotify album on Bandcamp and add it to your wishlist in a couple of clicks.",
+  "version": "0.1.0",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://open.spotify.com/*",
+    "https://*.bandcamp.com/*",
+    "https://bandcamp.com/*"
+  ],
+  "action": {
+    "default_title": "Bandcamp Wishlist Bridge",
+    "default_popup": "src/popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.bandcamp.com/*"
+      ],
+      "js": [
+        "src/content/bandcamp.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
