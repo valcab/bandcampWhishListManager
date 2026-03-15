@@ -47,12 +47,19 @@ async function initialize() {
 }
 
 async function extractSpotifyMetadata(tab) {
-  const fromOEmbed = await extractFromOEmbed(tab.url);
+  const livePageContext = await getLiveSpotifyPageContext(tab.id);
+  const liveUrl = livePageContext?.url || tab.url;
+
+  const fromOEmbed = await extractFromOEmbed(liveUrl);
   if (fromOEmbed?.album && fromOEmbed?.artist) {
     return fromOEmbed;
   }
 
-  return extractFromTab(tab.id);
+  return {
+    album: livePageContext?.album ?? "",
+    artist: livePageContext?.artist ?? "",
+    coverUrl: livePageContext?.coverUrl ?? ""
+  };
 }
 
 async function extractFromOEmbed(url) {
@@ -82,7 +89,7 @@ async function extractFromOEmbed(url) {
   }
 }
 
-async function extractFromTab(tabId) {
+async function getLiveSpotifyPageContext(tabId) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
@@ -186,6 +193,7 @@ async function extractFromTab(tabId) {
       );
 
       return {
+        url: window.location.href,
         album,
         artist,
         coverUrl: ogImage
