@@ -34,7 +34,7 @@ async function initialize() {
     return;
   }
 
-  metadata = await extractFromTab(tab.id);
+  metadata = await extractSpotifyMetadata(tab);
 
   if (!metadata?.album || !metadata?.artist) {
     setStatus("I found the Spotify album page, but not enough metadata to search Bandcamp.");
@@ -44,6 +44,42 @@ async function initialize() {
   renderAlbum(metadata);
   searchButton.disabled = false;
   setStatus("Ready. Search Bandcamp and add the best match to your wishlist.");
+}
+
+async function extractSpotifyMetadata(tab) {
+  const fromOEmbed = await extractFromOEmbed(tab.url);
+  if (fromOEmbed?.album && fromOEmbed?.artist) {
+    return fromOEmbed;
+  }
+
+  return extractFromTab(tab.id);
+}
+
+async function extractFromOEmbed(url) {
+  try {
+    const endpoint = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`;
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const parsed = parseSpotifyTitle(data.title ?? "");
+    const album = parsed.album || "";
+    const artist = data.author_name?.trim() || parsed.artist || "";
+
+    if (!album || !artist) {
+      return null;
+    }
+
+    return {
+      album,
+      artist,
+      coverUrl: data.thumbnail_url ?? ""
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function extractFromTab(tabId) {
@@ -158,6 +194,27 @@ async function extractFromTab(tabId) {
   });
 
   return result;
+}
+
+function parseSpotifyTitle(value) {
+  const cleaned = String(value ?? "").replace(/\s*\|\s*Spotify$/i, "").trim();
+  const patterns = [
+    /^(.*?)\s*-\s*Album\s+by\s+(.+)$/i,
+    /^(.*?)\s*-\s*Album\s+par\s+(.+)$/i,
+    /^(.*?)\s*-\s*(.+?)\s*$/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = cleaned.match(pattern);
+    if (match?.[1]?.trim()) {
+      return {
+        album: match[1].trim(),
+        artist: match[2]?.trim() ?? ""
+      };
+    }
+  }
+
+  return { album: cleaned, artist: "" };
 }
 
 function renderAlbum(details) {
