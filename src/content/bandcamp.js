@@ -47,29 +47,24 @@ function attemptWishlistClick() {
     return "already";
   }
 
-  control.click();
+  activateWishlistControl(control);
   return "clicked";
 }
 
 function findWishlistControl() {
-  const collectItem = document.getElementById("collect-item");
-  if (collectItem) {
-    const clickableParent = collectItem.closest("button, a, span, div");
-    if (clickableParent) {
-      return clickableParent;
-    }
-
-    return collectItem;
-  }
-
   const wishlistMessage = document.getElementById("wishlist-msg");
   if (wishlistMessage) {
-    const clickableParent = wishlistMessage.closest("button, a, span, div");
-    if (clickableParent) {
-      return clickableParent;
+    const nestedLink = wishlistMessage.querySelector("a");
+    if (nestedLink) {
+      return nestedLink;
     }
 
     return wishlistMessage;
+  }
+
+  const collectItem = document.getElementById("collect-item");
+  if (collectItem) {
+    return collectItem;
   }
 
   const selectors = [
@@ -89,6 +84,26 @@ function findWishlistControl() {
   }
 
   return null;
+}
+
+function activateWishlistControl(control) {
+  const target = control.closest("#wishlist-msg") || control;
+  dispatchMouseSequence(target);
+
+  if (control !== target) {
+    dispatchMouseSequence(control);
+  }
+}
+
+function dispatchMouseSequence(node) {
+  for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+    node.dispatchEvent(new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window
+    }));
+  }
 }
 
 function readLabel(node) {
