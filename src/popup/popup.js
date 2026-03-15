@@ -216,7 +216,14 @@ async function getLiveSpotifyPageContext(tabId) {
       const twitterTitle = attr('meta[name="twitter:title"]', "content");
       const ogDescription = attr('meta[property="og:description"]', "content");
       const twitterDescription = attr('meta[name="twitter:description"]', "content");
+      const pageImage = firstNonEmpty(
+        attr('[data-testid="entityHeader"] img', "src"),
+        attr('[data-testid="entityHeader"] img', "srcset").split(",")[0]?.trim().split(" ")[0] ?? "",
+        attr('main img[alt]', "src"),
+        attr('img[src*="i.scdn.co/image/"]', "src")
+      );
       const ogImage = firstNonEmpty(
+        pageImage,
         attr('meta[property="og:image"]', "content"),
         attr('meta[name="twitter:image"]', "content")
       );
@@ -286,8 +293,14 @@ function renderAlbum(details) {
   albumCard.classList.remove("hidden");
   albumTitleNode.textContent = details.album;
   albumArtistNode.textContent = details.artist;
-  coverNode.src = details.coverUrl || "";
   coverNode.alt = `${details.album} cover`;
+  if (details.coverUrl) {
+    coverNode.src = details.coverUrl;
+    coverNode.classList.remove("cover-fallback");
+  } else {
+    coverNode.removeAttribute("src");
+    coverNode.classList.add("cover-fallback");
+  }
 }
 
 function hideAlbum() {
@@ -296,6 +309,7 @@ function hideAlbum() {
   albumArtistNode.textContent = "";
   coverNode.removeAttribute("src");
   coverNode.alt = "";
+  coverNode.classList.remove("cover-fallback");
 }
 
 async function searchMatches(details) {
@@ -401,6 +415,11 @@ function resetPopupState(message) {
   clearResults();
   setStatus(message);
 }
+
+coverNode.addEventListener("error", () => {
+  coverNode.removeAttribute("src");
+  coverNode.classList.add("cover-fallback");
+});
 
 function isSpotifyAlbumUrl(rawUrl) {
   try {

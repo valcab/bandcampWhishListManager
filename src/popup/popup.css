@@ -87,6 +87,12 @@ h1 {
   background: rgba(0, 0, 0, 0.08);
 }
 
+.cover-fallback {
+  background:
+    radial-gradient(circle at top left, rgba(15, 107, 97, 0.25), transparent 45%),
+    linear-gradient(135deg, rgba(31, 27, 23, 0.08), rgba(31, 27, 23, 0.18));
+}
+
 .meta {
   margin-top: 8px;
   color: var(--muted);
