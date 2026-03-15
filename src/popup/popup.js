@@ -27,14 +27,14 @@ searchButton.addEventListener("click", () => {
 });
 
 async function initialize() {
-  clearResults();
+  resetPopupState("Open a Spotify album page to get started.");
   const [tab] = await chrome.tabs.query({
     active: true,
     currentWindow: true
   });
 
   if (!tab?.url || !isSpotifyAlbumUrl(tab.url)) {
-    setStatus("Open a Spotify album page, then click the extension again.");
+    resetPopupState("Open a Spotify album page, then click the extension again.");
     return;
   }
 
@@ -46,10 +46,7 @@ async function refreshFromTab(tab) {
   const nextMetadata = await extractSpotifyMetadata(tab);
 
   if (!nextMetadata?.album || !nextMetadata?.artist) {
-    metadata = null;
-    currentAlbumKey = "";
-    hideAlbum();
-    setStatus("I found the Spotify album page, but not enough metadata to search Bandcamp.");
+    resetPopupState("I found the Spotify album page, but not enough metadata to search Bandcamp.");
     return;
   }
 
@@ -78,6 +75,9 @@ function startAutoRefresh() {
       });
 
       if (!tab?.id || !tab.url || !isSpotifyAlbumUrl(tab.url)) {
+        if (metadata || currentAlbumKey) {
+          resetPopupState("Open a Spotify album page, then click the extension again.");
+        }
         return;
       }
 
@@ -377,6 +377,14 @@ function clearResults() {
   resultsNode.classList.add("hidden");
   resultsNode.replaceChildren();
   searchButton.disabled = true;
+}
+
+function resetPopupState(message) {
+  metadata = null;
+  currentAlbumKey = "";
+  hideAlbum();
+  clearResults();
+  setStatus(message);
 }
 
 function isSpotifyAlbumUrl(rawUrl) {
