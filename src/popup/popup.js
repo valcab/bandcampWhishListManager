@@ -50,18 +50,100 @@ async function extractFromTab(tabId) {
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
+      const firstNonEmpty = (...values) => values.find((value) => Boolean(value && value.trim()))?.trim() ?? "";
+      const text = (selector) => document.querySelector(selector)?.textContent?.trim() ?? "";
+      const attr = (selector, name) => document.querySelector(selector)?.getAttribute(name)?.trim() ?? "";
+
       const parseArtistFromDescription = (description) => {
-        const match = description.match(/Album\s*[·-]\s*(.*?)\s*[·-]\s*\d{4}/i);
-        return match?.[1]?.trim() ?? "";
+        const patterns = [
+          /Album\s*[·-]\s*(.*?)\s*[·-]\s*\d{4}/i,
+          /Album\s+by\s+(.+?)(?:\s*[·-]\s*|$)/i,
+          /Album\s+par\s+(.+?)(?:\s*[·-]\s*|$)/i
+        ];
+
+        for (const pattern of patterns) {
+          const match = description.match(pattern);
+          if (match?.[1]?.trim()) {
+            return match[1].trim();
+          }
+        }
+
+        return "";
       };
-      const cleanAlbumTitle = (title) => title.replace(/\s*\|\s*Spotify$/i, "").trim();
-      const ogTitle = document.querySelector('meta[property="og:title"]')?.content ?? "";
-      const ogDescription = document.querySelector('meta[property="og:description"]')?.content ?? "";
-      const ogImage = document.querySelector('meta[property="og:image"]')?.content ?? "";
-      const titleNode = document.querySelector("h1");
-      const artistNode = document.querySelector('[data-testid="entitySubTitle"] a, [href^="/artist/"]');
-      const album = titleNode?.textContent?.trim() || cleanAlbumTitle(ogTitle);
-      const artist = artistNode?.textContent?.trim() || parseArtistFromDescription(ogDescription);
+      const cleanSpotifySuffix = (value) => value.replace(/\s*\|\s*Spotify$/i, "").trim();
+      const parseTitleLine = (value) => {
+        const cleaned = cleanSpotifySuffix(value);
+        const patterns = [
+          /^(.*?)\s*-\s*Album\s+by\s+(.+)$/i,
+          /^(.*?)\s*-\s*Album\s+par\s+(.+)$/i,
+          /^(.*?)\s*-\s*(.+?)\s*$/i
+        ];
+
+        for (const pattern of patterns) {
+          const match = cleaned.match(pattern);
+          if (match?.[1]?.trim()) {
+            return {
+              album: match[1].trim(),
+              artist: match[2]?.trim() ?? ""
+            };
+          }
+        }
+
+        return { album: cleaned, artist: "" };
+      };
+      const parseJsonLd = () => {
+        const scripts = [...document.querySelectorAll('script[type="application/ld+json"]')];
+        for (const script of scripts) {
+          try {
+            const data = JSON.parse(script.textContent ?? "{}");
+            const nodes = Array.isArray(data) ? data : [data];
+            for (const node of nodes) {
+              const byArtist = node?.byArtist;
+              const artistName = Array.isArray(byArtist)
+                ? byArtist.map((entry) => entry?.name).find(Boolean)
+                : byArtist?.name ?? "";
+              const albumName = node?.name ?? "";
+              if (albumName || artistName) {
+                return {
+                  album: albumName.trim(),
+                  artist: artistName.trim()
+                };
+              }
+            }
+          } catch {}
+        }
+
+        return { album: "", artist: "" };
+      };
+      const titleNodeText = firstNonEmpty(text("h1"), text('[data-testid="entityTitle"]'));
+      const ogTitle = attr('meta[property="og:title"]', "content");
+      const twitterTitle = attr('meta[name="twitter:title"]', "content");
+      const ogDescription = attr('meta[property="og:description"]', "content");
+      const twitterDescription = attr('meta[name="twitter:description"]', "content");
+      const ogImage = firstNonEmpty(
+        attr('meta[property="og:image"]', "content"),
+        attr('meta[name="twitter:image"]', "content")
+      );
+      const titleInfo = parseTitleLine(firstNonEmpty(document.title, ogTitle, twitterTitle));
+      const jsonLd = parseJsonLd();
+      const artistLinks = [...document.querySelectorAll('a[href*="/artist/"]')]
+        .map((node) => node.textContent?.trim() ?? "")
+        .filter(Boolean);
+
+      const album = firstNonEmpty(
+        titleNodeText,
+        cleanSpotifySuffix(ogTitle),
+        cleanSpotifySuffix(twitterTitle),
+        titleInfo.album,
+        jsonLd.album
+      );
+      const artist = firstNonEmpty(
+        artistLinks[0],
+        text('[data-testid="entitySubTitle"] a'),
+        titleInfo.artist,
+        parseArtistFromDescription(firstNonEmpty(ogDescription, twitterDescription)),
+        jsonLd.artist
+      );
 
       return {
         album,
