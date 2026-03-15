@@ -1,20 +1,26 @@
 # Bandcamp Wishlist Bridge
 
-A lightweight Chrome extension that helps you jump from a Spotify album page to the matching Bandcamp release and click the wishlist button for you.
+A lightweight Chrome extension that watches the current Spotify album page, searches Bandcamp automatically, and opens the closest matching release.
 
 ## What it does
 
 1. Open a Spotify album page like `https://open.spotify.com/album/...`.
 2. Click the extension icon.
-3. Search Bandcamp for likely album matches.
-4. Use `Quick add best match` or pick a specific result.
-5. The extension opens the Bandcamp album page and tries to click `Add to wishlist` automatically.
+3. The React popup reads the current album, shows loading feedback, and searches Bandcamp automatically.
+4. Review the matches or open the best match directly.
+5. Use the settings tab to switch language, theme, and result count.
 
-## Notes
+## Tech notes
 
-- You need to be signed in to Bandcamp for the wishlist action to stick.
-- This extension intentionally uses Bandcamp's own web UI instead of a private Bandcamp API.
-- If Bandcamp changes its page structure, the search or auto-click step may need a selector update.
+- The popup UI is now built with React and a shadcn-style component structure.
+- Settings are stored with `chrome.storage.sync`.
+- The extension uses Bandcamp search results instead of any private Bandcamp API.
+
+## Build
+
+1. Run `npm install`.
+2. Run `npm run build`.
+3. Reload the unpacked extension in Chrome so it picks up the new popup bundle.
 
 ## Load it in Chrome
 
@@ -26,6 +32,8 @@ A lightweight Chrome extension that helps you jump from a Spotify album page to 
 ## Project structure
 
 - `manifest.json`: MV3 extension manifest
-- `src/background.js`: Bandcamp search and tab-opening logic
-- `src/content/bandcamp.js`: auto-clicks the wishlist button on Bandcamp pages opened by the extension
-- `src/popup/*`: popup UI shown from the extension toolbar
+- `scripts/build-popup.mjs`: esbuild bundle step for the popup
+- `src/popup/App.jsx`: React popup app
+- `src/popup/components/ui/*`: shadcn-style UI components
+- `src/popup/lib/extension.js`: Spotify metadata and Bandcamp search logic
+- `src/popup/popup.bundle.js`: built popup bundle loaded by Chrome

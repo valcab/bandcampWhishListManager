@@ -7,23 +7,7 @@
     <link rel="stylesheet" href="./popup.css" />
   </head>
   <body>
-    <main class="app">
-      <section class="hero">
-        <p class="eyebrow">Spotify to Bandcamp</p>
-        <h1>Bandcamp Wishlist Bridge</h1>
-        <p class="subcopy" id="status">Open a Spotify album page to get started.</p>
-      </section>
-
-      <section class="album hidden" id="album-card">
-        <img alt="" class="cover" id="cover" />
-        <div>
-          <p class="label">Album</p>
-          <h2 id="album-title"></h2>
-          <p class="meta" id="album-artist"></p>
-        </div>
-      </section>
-      <section class="results hidden" id="results"></section>
-    </main>
-    <script type="module" src="./popup.js"></script>
+    <div id="root"></div>
+    <script type="module" src="./popup.bundle.js"></script>
   </body>
 </html>

@@ -1,89 +1,26 @@
-const statusNode = document.getElementById("status");
-const albumCard = document.getElementById("album-card");
-const resultsNode = document.getElementById("results");
-const coverNode = document.getElementById("cover");
-const albumTitleNode = document.getElementById("album-title");
-const albumArtistNode = document.getElementById("album-artist");
-const RESULT_LIMIT = 6;
-const REFRESH_INTERVAL_MS = 1200;
-
-let metadata = null;
-let currentAlbumKey = "";
-let refreshTimer = null;
-let lastSearchedAlbumKey = "";
-let searchInFlightKey = "";
-
-initialize().catch((error) => {
-  setStatus(error instanceof Error ? error.message : String(error));
-});
-
-async function initialize() {
-  resetPopupState("Open a Spotify album page to get started.");
+export async function getActiveTab() {
   const [tab] = await chrome.tabs.query({
     active: true,
     currentWindow: true
   });
 
-  if (!tab?.url || !isSpotifyAlbumUrl(tab.url)) {
-    resetPopupState("Open a Spotify album page, then click the extension again.");
-    return;
-  }
-
-  await refreshFromTab(tab);
-  startAutoRefresh();
+  return tab;
 }
 
-async function refreshFromTab(tab) {
-  const nextMetadata = await extractSpotifyMetadata(tab);
+export function isSpotifyAlbumUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== "open.spotify.com") {
+      return false;
+    }
 
-  if (!nextMetadata?.album || !nextMetadata?.artist) {
-    resetPopupState("I found the Spotify album page, but not enough metadata to search Bandcamp.");
-    return;
+    return /^\/(?:intl-[^/]+\/)?album\/[^/]+/.test(url.pathname);
+  } catch {
+    return false;
   }
-
-  const nextAlbumKey = `${nextMetadata.album}::${nextMetadata.artist}`.toLowerCase();
-  if (currentAlbumKey && currentAlbumKey !== nextAlbumKey) {
-    clearResults();
-  }
-
-  metadata = nextMetadata;
-  currentAlbumKey = nextAlbumKey;
-  renderAlbum(metadata);
-  setStatus("Searching Bandcamp...");
-  maybeSearchCurrentAlbum();
 }
 
-function startAutoRefresh() {
-  if (refreshTimer) {
-    window.clearInterval(refreshTimer);
-  }
-
-  refreshTimer = window.setInterval(async () => {
-    try {
-      const [tab] = await chrome.tabs.query({
-        active: true,
-        currentWindow: true
-      });
-
-      if (!tab?.id || !tab.url || !isSpotifyAlbumUrl(tab.url)) {
-        if (metadata || currentAlbumKey) {
-          resetPopupState("Open a Spotify album page, then click the extension again.");
-        }
-        return;
-      }
-
-      const nextMetadata = await extractSpotifyMetadata(tab);
-      const nextAlbumKey = `${nextMetadata?.album ?? ""}::${nextMetadata?.artist ?? ""}`.toLowerCase();
-      if (!nextAlbumKey || nextAlbumKey === currentAlbumKey) {
-        return;
-      }
-
-      await refreshFromTab(tab);
-    } catch {}
-  }, REFRESH_INTERVAL_MS);
-}
-
-async function extractSpotifyMetadata(tab) {
+export async function extractSpotifyMetadata(tab) {
   const livePageContext = await getLiveSpotifyPageContext(tab.id);
   const liveUrl = livePageContext?.url || tab.url;
   const fromOEmbed = await extractFromOEmbed(liveUrl);
@@ -131,7 +68,6 @@ async function getLiveSpotifyPageContext(tabId) {
       const attr = (selector, name) => document.querySelector(selector)?.getAttribute(name)?.trim() ?? "";
       const textFrom = (root, selector) => root?.querySelector(selector)?.textContent?.trim() ?? "";
       const closest = (node, selector) => node?.closest(selector) ?? null;
-
       const parseArtistFromDescription = (description) => {
         const patterns = [
           /Album\s*[·-]\s*(.*?)\s*[·-]\s*\d{4}/i,
@@ -193,8 +129,9 @@ async function getLiveSpotifyPageContext(tabId) {
 
         return { album: "", artist: "" };
       };
+
       const albumHeading =
-        document.querySelector('main h1') ||
+        document.querySelector("main h1") ||
         document.querySelector('[data-testid="entityTitle"]') ||
         document.querySelector("h1");
       const albumHeader =
@@ -210,10 +147,10 @@ async function getLiveSpotifyPageContext(tabId) {
       const pageImage = firstNonEmpty(
         attr('[data-testid="entityHeader"] img', "src"),
         attr('[data-testid="entityHeader"] img', "srcset").split(",")[0]?.trim().split(" ")[0] ?? "",
-        attr('main img[alt]', "src"),
+        attr("main img[alt]", "src"),
         attr('img[src*="i.scdn.co/image/"]', "src")
       );
-      const ogImage = firstNonEmpty(
+      const fallbackImage = firstNonEmpty(
         pageImage,
         attr('meta[property="og:image"]', "content"),
         attr('meta[name="twitter:image"]', "content")
@@ -224,34 +161,31 @@ async function getLiveSpotifyPageContext(tabId) {
         textFrom(albumHeader, '[data-testid="creator-link"]'),
         textFrom(albumHeader, 'a[data-testid="creator-link"]'),
         textFrom(albumHeader, 'a[href*="/artist/"]'),
-        textFrom(albumHeader, 'span a'),
-        textFrom(albumHeader, 'a')
+        textFrom(albumHeader, "span a"),
+        textFrom(albumHeader, "a")
       ].filter(Boolean);
       const artistLinks = [...document.querySelectorAll('main a[href*="/artist/"]')]
         .map((node) => node.textContent?.trim() ?? "")
         .filter(Boolean);
 
-      const album = firstNonEmpty(
-        titleNodeText,
-        titleInfo.album,
-        cleanSpotifySuffix(ogTitle),
-        cleanSpotifySuffix(twitterTitle),
-        jsonLd.album
-      );
-      const artist = firstNonEmpty(
-        pageArtistCandidates[0],
-        artistLinks[0],
-        textFrom(albumHeader, '[data-testid="entitySubTitle"] a'),
-        titleInfo.artist,
-        parseArtistFromDescription(firstNonEmpty(ogDescription, twitterDescription)),
-        jsonLd.artist
-      );
-
       return {
         url: window.location.href,
-        album,
-        artist,
-        coverUrl: ogImage
+        album: firstNonEmpty(
+          titleNodeText,
+          titleInfo.album,
+          cleanSpotifySuffix(ogTitle),
+          cleanSpotifySuffix(twitterTitle),
+          jsonLd.album
+        ),
+        artist: firstNonEmpty(
+          pageArtistCandidates[0],
+          artistLinks[0],
+          textFrom(albumHeader, '[data-testid="entitySubTitle"] a'),
+          titleInfo.artist,
+          parseArtistFromDescription(firstNonEmpty(ogDescription, twitterDescription)),
+          jsonLd.artist
+        ),
+        coverUrl: fallbackImage
       };
     }
   });
@@ -280,170 +214,7 @@ function parseSpotifyTitle(value) {
   return { album: cleaned, artist: "" };
 }
 
-function renderAlbum(details) {
-  albumCard.classList.remove("hidden");
-  albumTitleNode.textContent = details.album;
-  albumArtistNode.textContent = details.artist;
-  coverNode.alt = `${details.album} cover`;
-  if (details.coverUrl) {
-    coverNode.src = details.coverUrl;
-    coverNode.classList.remove("cover-fallback");
-  } else {
-    coverNode.removeAttribute("src");
-    coverNode.classList.add("cover-fallback");
-  }
-}
-
-function hideAlbum() {
-  albumCard.classList.add("hidden");
-  albumTitleNode.textContent = "";
-  albumArtistNode.textContent = "";
-  coverNode.removeAttribute("src");
-  coverNode.alt = "";
-  coverNode.classList.remove("cover-fallback");
-}
-
-function maybeSearchCurrentAlbum() {
-  if (!metadata || !currentAlbumKey) {
-    return;
-  }
-
-  if (searchInFlightKey === currentAlbumKey || lastSearchedAlbumKey === currentAlbumKey) {
-    return;
-  }
-
-  searchInFlightKey = currentAlbumKey;
-  searchMatches(metadata)
-    .then(() => {
-      lastSearchedAlbumKey = currentAlbumKey;
-    })
-    .catch((error) => {
-      setStatus(error instanceof Error ? error.message : String(error));
-    })
-    .finally(() => {
-      if (searchInFlightKey === currentAlbumKey) {
-        searchInFlightKey = "";
-      }
-    });
-}
-
-async function searchMatches(details) {
-  setStatus("Searching Bandcamp...");
-  resultsNode.classList.add("hidden");
-  resultsNode.replaceChildren();
-
-  const matches = await findBandcampMatches(details);
-
-  if (!matches.length) {
-    setStatus("No Bandcamp album matches found for this release.");
-    return;
-  }
-
-  const topMatch = matches[0];
-  const quickAdd = document.createElement("button");
-  quickAdd.className = "primary";
-  quickAdd.type = "button";
-  quickAdd.textContent = `Open best match (${topMatch.score}%)`;
-  quickAdd.addEventListener("click", () => openBandcampRelease(topMatch));
-
-  resultsNode.appendChild(quickAdd);
-
-  for (const result of matches) {
-    resultsNode.appendChild(renderResult(result));
-  }
-
-  resultsNode.classList.remove("hidden");
-  setStatus("Bandcamp matches ready.");
-}
-
-function renderResult(result) {
-  const wrapper = document.createElement("article");
-  wrapper.className = "result";
-
-  const image = document.createElement("img");
-  image.alt = "";
-  image.src = result.art || "";
-  wrapper.appendChild(image);
-
-  const body = document.createElement("div");
-  const score = document.createElement("p");
-  score.className = "match-score";
-  score.textContent = `Match ${result.score}%`;
-  body.appendChild(score);
-
-  const title = document.createElement("h3");
-  title.textContent = result.title;
-  body.appendChild(title);
-
-  const artist = document.createElement("p");
-  artist.textContent = result.artist;
-  body.appendChild(artist);
-
-  if (result.label) {
-    const label = document.createElement("p");
-    label.textContent = result.label;
-    body.appendChild(label);
-  }
-
-  const addButton = document.createElement("button");
-  addButton.className = "secondary";
-  addButton.type = "button";
-  addButton.textContent = "Open on Bandcamp";
-  addButton.addEventListener("click", () => openBandcampRelease(result));
-  body.appendChild(addButton);
-
-  wrapper.appendChild(body);
-  return wrapper;
-}
-
-async function openBandcampRelease(result) {
-  setStatus(`Opening ${result.title} on Bandcamp...`);
-  await chrome.tabs.create({
-    url: result.url,
-    active: true
-  });
-
-  window.close();
-}
-
-function setStatus(message) {
-  statusNode.textContent = message;
-}
-
-function clearResults() {
-  resultsNode.classList.add("hidden");
-  resultsNode.replaceChildren();
-  lastSearchedAlbumKey = "";
-  searchInFlightKey = "";
-}
-
-function resetPopupState(message) {
-  metadata = null;
-  currentAlbumKey = "";
-  hideAlbum();
-  clearResults();
-  setStatus(message);
-}
-
-coverNode.addEventListener("error", () => {
-  coverNode.removeAttribute("src");
-  coverNode.classList.add("cover-fallback");
-});
-
-function isSpotifyAlbumUrl(rawUrl) {
-  try {
-    const url = new URL(rawUrl);
-    if (url.hostname !== "open.spotify.com") {
-      return false;
-    }
-
-    return /^\/(?:intl-[^/]+\/)?album\/[^/]+/.test(url.pathname);
-  } catch {
-    return false;
-  }
-}
-
-async function findBandcampMatches(details) {
+export async function findBandcampMatches(details, resultLimit = 6) {
   const queries = [
     [details.artist, details.album].filter(Boolean).join(" "),
     details.album,
@@ -470,7 +241,7 @@ async function findBandcampMatches(details) {
 
   return [...dedupeResults(allResults)]
     .sort((a, b) => b.score - a.score)
-    .slice(0, RESULT_LIMIT);
+    .slice(0, resultLimit);
 }
 
 function extractResult(node, metadata) {
@@ -498,7 +269,6 @@ function extractResult(node, metadata) {
   const artist = text(node.querySelector(".subhead > a")) || subhead.replace(/^by\s+/i, "");
   const label = text(node.querySelector(".itemsubtext"));
   const art = node.querySelector("img")?.src ?? "";
-  const score = scoreMatch(metadata, { title, artist, url: headingLink.href });
 
   return {
     url: headingLink.href,
@@ -506,7 +276,7 @@ function extractResult(node, metadata) {
     artist,
     label,
     art,
-    score
+    score: scoreMatch(metadata, { title, artist, url: headingLink.href })
   };
 }
 
@@ -515,27 +285,6 @@ function scoreMatch(source, candidate) {
   const artistScore = combinedFieldScore(source.artist, candidate.artist);
   const slugBonus = scoreSlugMatch(source.artist, candidate.url);
   return Math.round((titleScore * 0.65 + artistScore * 0.25 + slugBonus * 0.1) * 100);
-}
-
-function similarity(left, right) {
-  const leftTokens = tokenize(left);
-  const rightTokens = tokenize(right);
-
-  if (!leftTokens.length || !rightTokens.length) {
-    return 0;
-  }
-
-  const leftSet = new Set(leftTokens);
-  const rightSet = new Set(rightTokens);
-  let shared = 0;
-
-  for (const token of leftSet) {
-    if (rightSet.has(token)) {
-      shared += 1;
-    }
-  }
-
-  return (2 * shared) / (leftSet.size + rightSet.size);
 }
 
 function combinedFieldScore(left, right) {
@@ -563,6 +312,27 @@ function combinedFieldScore(left, right) {
   const tokenScore = similarity(left, right);
   const orderedBonus = hasOrderedTokenRun(tokenize(left), tokenize(right)) ? 0.12 : 0;
   return Math.min(1, tokenScore + orderedBonus);
+}
+
+function similarity(left, right) {
+  const leftTokens = tokenize(left);
+  const rightTokens = tokenize(right);
+
+  if (!leftTokens.length || !rightTokens.length) {
+    return 0;
+  }
+
+  const leftSet = new Set(leftTokens);
+  const rightSet = new Set(rightTokens);
+  let shared = 0;
+
+  for (const token of leftSet) {
+    if (rightSet.has(token)) {
+      shared += 1;
+    }
+  }
+
+  return (2 * shared) / (leftSet.size + rightSet.size);
 }
 
 function tokenize(value) {
