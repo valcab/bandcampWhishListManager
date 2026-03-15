@@ -138,6 +138,8 @@ async function getLiveSpotifyPageContext(tabId) {
       const firstNonEmpty = (...values) => values.find((value) => Boolean(value && value.trim()))?.trim() ?? "";
       const text = (selector) => document.querySelector(selector)?.textContent?.trim() ?? "";
       const attr = (selector, name) => document.querySelector(selector)?.getAttribute(name)?.trim() ?? "";
+      const textFrom = (root, selector) => root?.querySelector(selector)?.textContent?.trim() ?? "";
+      const closest = (node, selector) => node?.closest(selector) ?? null;
 
       const parseArtistFromDescription = (description) => {
         const patterns = [
@@ -200,10 +202,16 @@ async function getLiveSpotifyPageContext(tabId) {
 
         return { album: "", artist: "" };
       };
-      const titleNodeText = firstNonEmpty(
-        text("h1"),
-        text('[data-testid="entityTitle"]')
-      );
+      const albumHeading =
+        document.querySelector('main h1') ||
+        document.querySelector('[data-testid="entityTitle"]') ||
+        document.querySelector("h1");
+      const albumHeader =
+        closest(albumHeading, '[data-testid="entityHeader"]') ||
+        closest(albumHeading, "section") ||
+        closest(albumHeading, "main") ||
+        document.querySelector("main");
+      const titleNodeText = firstNonEmpty(albumHeading?.textContent ?? "", text('[data-testid="entityTitle"]'));
       const ogTitle = attr('meta[property="og:title"]', "content");
       const twitterTitle = attr('meta[name="twitter:title"]', "content");
       const ogDescription = attr('meta[property="og:description"]', "content");
@@ -214,21 +222,28 @@ async function getLiveSpotifyPageContext(tabId) {
       );
       const titleInfo = parseTitleLine(firstNonEmpty(document.title, ogTitle, twitterTitle));
       const jsonLd = parseJsonLd();
-      const artistLinks = [...document.querySelectorAll('a[href*="/artist/"]')]
+      const pageArtistCandidates = [
+        textFrom(albumHeader, '[data-testid="creator-link"]'),
+        textFrom(albumHeader, 'a[data-testid="creator-link"]'),
+        textFrom(albumHeader, 'a[href*="/artist/"]'),
+        textFrom(albumHeader, 'span a'),
+        textFrom(albumHeader, 'a')
+      ].filter(Boolean);
+      const artistLinks = [...document.querySelectorAll('main a[href*="/artist/"]')]
         .map((node) => node.textContent?.trim() ?? "")
         .filter(Boolean);
 
       const album = firstNonEmpty(
         titleNodeText,
+        titleInfo.album,
         cleanSpotifySuffix(ogTitle),
         cleanSpotifySuffix(twitterTitle),
-        titleInfo.album,
         jsonLd.album
       );
       const artist = firstNonEmpty(
-        text('[data-id="creator-link"]'),
+        pageArtistCandidates[0],
         artistLinks[0],
-        text('[data-testid="entitySubTitle"] a'),
+        textFrom(albumHeader, '[data-testid="entitySubTitle"] a'),
         titleInfo.artist,
         parseArtistFromDescription(firstNonEmpty(ogDescription, twitterDescription)),
         jsonLd.artist
