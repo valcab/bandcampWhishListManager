@@ -1,7 +1,6 @@
 const statusNode = document.getElementById("status");
 const albumCard = document.getElementById("album-card");
 const resultsNode = document.getElementById("results");
-const searchButton = document.getElementById("search-btn");
 const coverNode = document.getElementById("cover");
 const albumTitleNode = document.getElementById("album-title");
 const albumArtistNode = document.getElementById("album-artist");
@@ -11,19 +10,11 @@ const REFRESH_INTERVAL_MS = 1200;
 let metadata = null;
 let currentAlbumKey = "";
 let refreshTimer = null;
+let lastSearchedAlbumKey = "";
+let searchInFlightKey = "";
 
 initialize().catch((error) => {
   setStatus(error instanceof Error ? error.message : String(error));
-});
-
-searchButton.addEventListener("click", () => {
-  if (!metadata) {
-    return;
-  }
-
-  searchMatches(metadata).catch((error) => {
-    setStatus(error instanceof Error ? error.message : String(error));
-  });
 });
 
 async function initialize() {
@@ -58,8 +49,8 @@ async function refreshFromTab(tab) {
   metadata = nextMetadata;
   currentAlbumKey = nextAlbumKey;
   renderAlbum(metadata);
-  searchButton.disabled = false;
-  setStatus("Ready. Search Bandcamp and add the best match to your wishlist.");
+  setStatus("Searching Bandcamp...");
+  maybeSearchCurrentAlbum();
 }
 
 function startAutoRefresh() {
@@ -312,8 +303,31 @@ function hideAlbum() {
   coverNode.classList.remove("cover-fallback");
 }
 
+function maybeSearchCurrentAlbum() {
+  if (!metadata || !currentAlbumKey) {
+    return;
+  }
+
+  if (searchInFlightKey === currentAlbumKey || lastSearchedAlbumKey === currentAlbumKey) {
+    return;
+  }
+
+  searchInFlightKey = currentAlbumKey;
+  searchMatches(metadata)
+    .then(() => {
+      lastSearchedAlbumKey = currentAlbumKey;
+    })
+    .catch((error) => {
+      setStatus(error instanceof Error ? error.message : String(error));
+    })
+    .finally(() => {
+      if (searchInFlightKey === currentAlbumKey) {
+        searchInFlightKey = "";
+      }
+    });
+}
+
 async function searchMatches(details) {
-  searchButton.disabled = true;
   setStatus("Searching Bandcamp...");
   resultsNode.classList.add("hidden");
   resultsNode.replaceChildren();
@@ -322,7 +336,6 @@ async function searchMatches(details) {
 
   if (!matches.length) {
     setStatus("No Bandcamp album matches found for this release.");
-    searchButton.disabled = false;
     return;
   }
 
@@ -340,8 +353,7 @@ async function searchMatches(details) {
   }
 
   resultsNode.classList.remove("hidden");
-  setStatus("Review the matches or quick-add the best one.");
-  searchButton.disabled = false;
+  setStatus("Bandcamp matches ready.");
 }
 
 function renderResult(result) {
@@ -405,7 +417,8 @@ function setStatus(message) {
 function clearResults() {
   resultsNode.classList.add("hidden");
   resultsNode.replaceChildren();
-  searchButton.disabled = true;
+  lastSearchedAlbumKey = "";
+  searchInFlightKey = "";
 }
 
 function resetPopupState(message) {

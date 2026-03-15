@@ -52,6 +52,16 @@ function attemptWishlistClick() {
 }
 
 function findWishlistControl() {
+  const collectItem = document.getElementById("collect-item");
+  if (collectItem) {
+    const clickableParent = collectItem.closest("button, a, span, div");
+    if (clickableParent) {
+      return clickableParent;
+    }
+
+    return collectItem;
+  }
+
   const wishlistMessage = document.getElementById("wishlist-msg");
   if (wishlistMessage) {
     const clickableParent = wishlistMessage.closest("button, a, span, div");
