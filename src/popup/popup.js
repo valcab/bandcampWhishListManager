@@ -29,7 +29,7 @@ async function initialize() {
     currentWindow: true
   });
 
-  if (!tab?.url || !/^https:\/\/open\.spotify\.com\/album\//.test(tab.url)) {
+  if (!tab?.url || !isSpotifyAlbumUrl(tab.url)) {
     setStatus("Open a Spotify album page, then click the extension again.");
     return;
   }
@@ -170,6 +170,19 @@ async function openAndWishlist(result) {
 
 function setStatus(message) {
   statusNode.textContent = message;
+}
+
+function isSpotifyAlbumUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== "open.spotify.com") {
+      return false;
+    }
+
+    return /^\/(?:intl-[^/]+\/)?album\/[^/]+/.test(url.pathname);
+  } catch {
+    return false;
+  }
 }
 
 async function findBandcampMatches(details) {
