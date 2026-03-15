@@ -268,20 +268,31 @@ function isSpotifyAlbumUrl(rawUrl) {
 }
 
 async function findBandcampMatches(details) {
-  const query = [details.artist, details.album].filter(Boolean).join(" ");
-  const url = `https://bandcamp.com/search?q=${encodeURIComponent(query)}&item_type=a`;
-  const response = await fetch(url, { credentials: "omit" });
+  const queries = [
+    [details.artist, details.album].filter(Boolean).join(" "),
+    details.album,
+    `${asciiFold(details.artist)} ${details.album}`.trim()
+  ].filter(Boolean);
 
-  if (!response.ok) {
-    throw new Error(`Bandcamp search failed with ${response.status}.`);
+  const allResults = [];
+  for (const query of [...new Set(queries)]) {
+    const url = `https://bandcamp.com/search?q=${encodeURIComponent(query)}&item_type=a`;
+    const response = await fetch(url, { credentials: "omit" });
+
+    if (!response.ok) {
+      throw new Error(`Bandcamp search failed with ${response.status}.`);
+    }
+
+    const html = await response.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const queryResults = [...doc.querySelectorAll(".result-items li.searchresult, li.searchresult")]
+      .map((node) => extractResult(node, details))
+      .filter(Boolean);
+
+    allResults.push(...queryResults);
   }
 
-  const html = await response.text();
-  const doc = new DOMParser().parseFromString(html, "text/html");
-
-  return [...doc.querySelectorAll(".result-items li.searchresult, li.searchresult")]
-    .map((node) => extractResult(node, details))
-    .filter(Boolean)
+  return [...dedupeResults(allResults)]
     .sort((a, b) => b.score - a.score)
     .slice(0, RESULT_LIMIT);
 }
@@ -292,16 +303,26 @@ function extractResult(node, metadata) {
     return null;
   }
 
-  const subhead = text(node.querySelector(".subhead"));
-  if (!/album/i.test(subhead)) {
+  const title = text(node.querySelector(".heading"));
+  if (!title) {
     return null;
   }
 
-  const title = text(node.querySelector(".heading"));
+  const typeText = [
+    text(node.querySelector(".type")),
+    text(node.querySelector(".itemtype")),
+    text(node.querySelector(".subhead"))
+  ].join(" ");
+
+  if (/(track|song)/i.test(typeText) && !/album/i.test(typeText)) {
+    return null;
+  }
+
+  const subhead = text(node.querySelector(".subhead"));
   const artist = text(node.querySelector(".subhead > a")) || subhead.replace(/^by\s+/i, "");
   const label = text(node.querySelector(".itemsubtext"));
   const art = node.querySelector("img")?.src ?? "";
-  const score = scoreMatch(metadata, { title, artist });
+  const score = scoreMatch(metadata, { title, artist, url: headingLink.href });
 
   return {
     url: headingLink.href,
@@ -326,7 +347,8 @@ function withBridgeHash(url, details) {
 function scoreMatch(source, candidate) {
   const titleScore = similarity(source.album, candidate.title);
   const artistScore = similarity(source.artist, candidate.artist);
-  return Math.round((titleScore * 0.6 + artistScore * 0.4) * 100);
+  const slugBonus = scoreSlugMatch(source.artist, candidate.url);
+  return Math.round((titleScore * 0.55 + artistScore * 0.35 + slugBonus * 0.1) * 100);
 }
 
 function similarity(left, right) {
@@ -351,12 +373,42 @@ function similarity(left, right) {
 }
 
 function tokenize(value) {
-  return String(value ?? "")
-    .toLowerCase()
+  return asciiFold(String(value ?? ""))
     .normalize("NFKD")
-    .replace(/[^\w\s]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
     .filter(Boolean);
+}
+
+function asciiFold(value) {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function scoreSlugMatch(artist, url) {
+  try {
+    const hostname = new URL(url).hostname;
+    const subdomain = hostname.split(".")[0] ?? "";
+    const slug = asciiFold(artist).replace(/[^\p{L}\p{N}]+/gu, "");
+    const candidate = asciiFold(subdomain).replace(/[^\p{L}\p{N}]+/gu, "");
+    return slug && candidate && (candidate.includes(slug) || slug.includes(candidate)) ? 1 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function dedupeResults(results) {
+  const byUrl = new Map();
+  for (const result of results) {
+    const existing = byUrl.get(result.url);
+    if (!existing || result.score > existing.score) {
+      byUrl.set(result.url, result);
+    }
+  }
+
+  return byUrl.values();
 }
 
 function text(node) {
