@@ -115,7 +115,10 @@ async function extractFromTab(tabId) {
 
         return { album: "", artist: "" };
       };
-      const titleNodeText = firstNonEmpty(text("h1"), text('[data-testid="entityTitle"]'));
+      const titleNodeText = firstNonEmpty(
+        text("h1"),
+        text('[data-testid="entityTitle"]')
+      );
       const ogTitle = attr('meta[property="og:title"]', "content");
       const twitterTitle = attr('meta[name="twitter:title"]', "content");
       const ogDescription = attr('meta[property="og:description"]', "content");
@@ -138,6 +141,7 @@ async function extractFromTab(tabId) {
         jsonLd.album
       );
       const artist = firstNonEmpty(
+        text('[data-id="creator-link"]'),
         artistLinks[0],
         text('[data-testid="entitySubTitle"] a'),
         titleInfo.artist,
