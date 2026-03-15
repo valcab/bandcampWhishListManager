@@ -95,16 +95,12 @@ function startAutoRefresh() {
 async function extractSpotifyMetadata(tab) {
   const livePageContext = await getLiveSpotifyPageContext(tab.id);
   const liveUrl = livePageContext?.url || tab.url;
-
   const fromOEmbed = await extractFromOEmbed(liveUrl);
-  if (fromOEmbed?.album && fromOEmbed?.artist) {
-    return fromOEmbed;
-  }
 
   return {
-    album: livePageContext?.album ?? "",
-    artist: livePageContext?.artist ?? "",
-    coverUrl: livePageContext?.coverUrl ?? ""
+    album: livePageContext?.album || fromOEmbed?.album || "",
+    artist: livePageContext?.artist || fromOEmbed?.artist || "",
+    coverUrl: livePageContext?.coverUrl || fromOEmbed?.coverUrl || ""
   };
 }
 
