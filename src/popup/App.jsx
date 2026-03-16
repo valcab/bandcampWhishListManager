@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, ExternalLink, Globe, LoaderCircle, Palette, Search } from "lucide-react";
+import { Check, ExternalLink, Globe, Info, LoaderCircle, Palette, Search } from "lucide-react";
 import { Button } from "./components/ui/button.jsx";
 import { Card } from "./components/ui/card.jsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select.jsx";
@@ -10,7 +10,7 @@ import { extractSpotifyMetadata, findBandcampMatches, getActiveTab, isSpotifyAlb
 
 const DEFAULT_SETTINGS = {
   language: "en",
-  theme: "spotify",
+  theme: "bandcamp",
   resultCount: "6"
 };
 
@@ -225,9 +225,17 @@ export function App() {
   return (
     <div className="popup-shell">
       <header className="hero-card">
-        <p className="eyebrow">Spotify to Bandcamp</p>
-        <div className="hero-row">
-          <h1 className="title">{t.appTitle}</h1>
+        <div className="hero-row hero-row-spread">
+          <div className="brand-row">
+            <div className="brand-mark">B</div>
+            <div>
+              <p className="eyebrow">Spotify to Bandcamp</p>
+              <h1 className="title">{t.appTitle}</h1>
+            </div>
+          </div>
+          <button className="icon-button" onClick={() => setActiveTab("settings")} type="button">
+            <Info size={18} />
+          </button>
         </div>
         <p className="subtitle">{t.appSubtitle}</p>
         <div style={{ marginTop: 14 }}>
@@ -241,7 +249,8 @@ export function App() {
       <Tabs className="tabs-root" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="tabs-list">
           <TabsTrigger className="tabs-trigger" value="matches">
-            {t.matchesTab}
+            <span>{t.matchesTab}</span>
+            <span className="tab-badge">{matches.length}</span>
           </TabsTrigger>
           <TabsTrigger className="tabs-trigger" value="settings">
             {t.settingsTab}
@@ -276,17 +285,6 @@ export function App() {
                 <div className="skeleton" />
                 <div className="skeleton" />
               </div>
-            ) : null}
-
-            {topMatch && phase !== "searching" ? (
-              <Button
-                className="ui-button-primary"
-                disabled={phase === "opening"}
-                onClick={() => openBandcampRelease(topMatch)}
-              >
-                {phase === "opening" && openingUrl === topMatch.url ? <LoaderCircle size={16} className="spin" /> : <ExternalLink size={16} />}
-                {t.openBest} ({topMatch.score}%)
-              </Button>
             ) : null}
 
             {matches.map((match) => (
@@ -367,6 +365,19 @@ export function App() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {topMatch ? (
+        <div className="footer-action">
+          <Button
+            className="ui-button-primary ui-button-large"
+            disabled={phase === "opening"}
+            onClick={() => openBandcampRelease(topMatch)}
+          >
+            {phase === "opening" && openingUrl === topMatch.url ? <LoaderCircle size={18} className="spin" /> : <ExternalLink size={18} />}
+            {t.openBest} ({topMatch.score}%)
+          </Button>
+        </div>
+      ) : null}
 
       <p className="footer-note">{t.footer}</p>
     </div>
